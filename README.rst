@@ -8,9 +8,7 @@ Installation (Ubuntu)
 =====================
 First we get FUSE: ::
 
-    sudo apt-get install build-essential libcurl4-openssl-dev libxml2-dev \
-        libfuse-dev comerr-dev libfuse2 libidn11-dev libkadm55 libkrb5-dev \
-        libldap2-dev libselinux1-dev libsepol1-dev pkg-config fuse-utils
+    sudo apt-get install build-essential libfuse-dev libfuse2 fuse-utils
 
 Fetchfs comes with python bindings for FUSE in the fuse.py file, but it can be found
 from here: ::
