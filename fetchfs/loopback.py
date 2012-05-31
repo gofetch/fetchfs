@@ -14,7 +14,7 @@ from stat import S_IFDIR, S_IFREG
 
 from dht import DHT
 
-a = DHT(('localhost',7000), local_ip='localhost', local_port=8001)
+a = DHT(('localhost',7004), local_ip='localhost', local_port=8002)
 
 def get_dir(path):
     ret = a[path]

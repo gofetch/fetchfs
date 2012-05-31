@@ -57,14 +57,12 @@ class DHT:
             if resp['msg'] == 'GET':
                 save_print('get')
                 lookup = resp['data']['key']
-                save_print('lookingup', lookup, self.port, self.table)
+                save_print('lookingup', conn.fileno())
                 if self.table.has_key(lookup):
                     save_print('found', self.port)
                     conn.send(json.dumps({'msg':'RECV','data':self.table[lookup]}))
                 else:
-                    #conn.close()
-                    pass
-            
+                    conn.send("nothing")
         except:
             pass
     
@@ -80,13 +78,13 @@ class DHT:
             s.connect(p)
             s.send(json.dumps({'msg':'GET', 'data':{'key':key}}))
             try:
-                s.settimeout(1)
                 resp = s.recv(1024)
-                if resp:
+                save_print("RESPONSE", resp)
+                if resp != "nothing":
                     resp = json.loads(resp)
                     return(resp['data'])
             except:
-                pass
+                save_print('hello error')
             s.close()
     
     def __setitem__(self, key, value):
