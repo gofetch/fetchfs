@@ -29,39 +29,78 @@ class DHT:
         try:
             resp = json.loads(data)
             if resp['msg'] == 'BOOTSTRAP':
-                save_print("BOOT")
                 # make connection to peer
                 s = socket.socket()
                 s.connect((resp['data']['ip'], resp['data']['port']))
                 s.send(json.dumps({'msg':'PEERS', 'data':self.peers}))
                 s.close()
+            
             if resp['msg'] == 'PEERS':
-                save_print("PEERS")
-                self.peers += resp['data']
+                others = resp['data']
+                self.peers += [tuple(p) for p in others]
+                for peer in others:
+                    s = socket.socket()
+                    s.connect(tuple(peer))
+                    s.send(json.dumps({'msg':'ANNOUNCE', 'data':{'ip':self.ip, 'port':self.port}}))
+                    s.close()
+            
+            if resp['msg'] == 'ANNOUNCE':
+                save_print("ANNOUN")
+                peer_ip = resp['data']['ip']
+                peer_port = resp['data']['port']
+                self.peers += [(peer_ip, peer_port)]
+            
+            if resp['msg'] == 'SET':
+                data = resp['data']
+                self.table[data['key']] = data['value']
+            
+            if resp['msg'] == 'GET':
+                save_print('get')
+                lookup = resp['data']['key']
+                save_print('lookingup', lookup, self.port, self.table)
+                if self.table.has_key(lookup):
+                    save_print('found', self.port)
+                    conn.send(json.dumps({'msg':'RECV','data':self.table[lookup]}))
+                else:
+                    conn.close()
+            
         except:
             pass
     
     def _bootstrap(self, bootstrap_node):
         s = socket.socket()
         s.connect(bootstrap_node)
-        s.settimeout(1)
         s.send(json.dumps({'msg':'BOOTSTRAP', 'data':{'ip':self.ip, 'port':self.port}}))
         s.close()
     
     def __getitem__(self, key):
-        pass
-
+        for p in self.peers:
+            s = socket.socket()
+            s.connect(p)
+            s.send(json.dumps({'msg':'GET', 'data':{'key':key}}))
+            try:
+                resp = s.recv(1024)
+                if resp:
+                    resp = json.loads(resp)
+                    return(resp['data'])
+            except:
+                pass
+    
     def __setitem__(self, key, value):
-        pass
+        peer = random.choice(self.peers)
+        s = socket.socket()
+        s.connect(peer)
+        s.send(json.dumps({'msg':'SET','data':{'key':key, 'value':value}}))
+        s.close()
 
-
-
+import time
 if __name__ == '__main__':
     import sys
     bootport = int(sys.argv[1])
     a = DHT(None, local_ip='localhost', local_port=bootport)
-    b = DHT(('localhost', bootport), local_ip='localhost', local_port=4002)
-    import time
-    time.sleep(3)
-    print(b.peers)
+    time.sleep(0.1)
+    b = DHT(('localhost',bootport), local_ip='localhost', local_port=bootport+1)
+    a['k1'] = 12
+    time.sleep(0.1)
+    print(b['k1'])
 
