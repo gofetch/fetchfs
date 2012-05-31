@@ -30,7 +30,7 @@ class StreamingServer(threading.Thread):
                     # handle all other sockets 
                     data = s.recv(self.chunksize)
                     if data:
-                        self.handle(s, address)
+                        self.handle(s, data)
                     else: 
                         s.close()
                         self.input.remove(s)

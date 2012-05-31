@@ -62,7 +62,8 @@ class DHT:
                     save_print('found', self.port)
                     conn.send(json.dumps({'msg':'RECV','data':self.table[lookup]}))
                 else:
-                    conn.close()
+                    #conn.close()
+                    pass
             
         except:
             pass
@@ -79,12 +80,14 @@ class DHT:
             s.connect(p)
             s.send(json.dumps({'msg':'GET', 'data':{'key':key}}))
             try:
+                s.settimeout(1)
                 resp = s.recv(1024)
                 if resp:
                     resp = json.loads(resp)
                     return(resp['data'])
             except:
                 pass
+            s.close()
     
     def __setitem__(self, key, value):
         peer = random.choice(self.peers)
@@ -98,9 +101,9 @@ if __name__ == '__main__':
     import sys
     bootport = int(sys.argv[1])
     a = DHT(None, local_ip='localhost', local_port=bootport)
-    time.sleep(0.1)
-    b = DHT(('localhost',bootport), local_ip='localhost', local_port=bootport+1)
-    a['k1'] = 12
-    time.sleep(0.1)
-    print(b['k1'])
+    a['/'] = [['.', 1, 0],['file1', 0, 132], ['dir1',1,0]]
+    a['/file1'] = [['file1',0, 132]]
+    a['/dir1'] = [['.', 1, 0], ['file2', 0, 142]]
+    a['/dir1/file2'] = [['file2', 0, 142]]
+    time.sleep(1000)
 
