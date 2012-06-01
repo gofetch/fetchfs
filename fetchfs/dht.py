@@ -1,107 +1,105 @@
-from __future__ import print_function
 from streamingserver import StreamingServer
-from hashlib import sha1 as hash
 import random
 import json
 import socket
+from utils import *
 
-from threading import Lock
+class Peer:
+    ''' a dht peer node. '''
+    def __init__(self, ip, port):
+        self.ip = ip
+        self.port = port
+        self.id = hash(repr(self))
+    
+    def __repr__(self):
+        return repr((self.ip, self.port))
+    
+    def astuple(self):
+        return (self.ip, self.port)
 
-print_lock = Lock()
-def save_print(*args, **kwargs):
-  with print_lock:
-    print (*args, **kwargs)
+
+class PeerList:
+    ''' a sorted list of peers based on hash id. '''
+    def __init__(self):
+        self.list = []
+
+    def __iter__(self):
+        return self.list.__iter__()
+    
+    def _sort(self):
+        sorted(self.list, key= lambda peer: peer.id)
+    
+    def add(self, peer):
+        assert isinstance(peer, Peer)
+        if peer not in self.list:
+            self.list.append(peer)
+            self._sort()
+    
+    def remove(self, peer):
+        self.list.remove(peer)
 
 class DHT:
     def __init__(self, bootstrap_node, local_port=5000, local_ip=''):
-        self.node = (local_ip, local_port)
-        self.ip = local_ip
-        self.port = local_port
-        self.nodeid = hash(str(random.random())).hexdigest()
+        self.selfnode = Peer(local_ip, local_port)
         self.server = StreamingServer(self._handle, local_ip, local_port)
-        self.peers = [self.node]
+        self.peers = PeerList()
+        self.peers.add(self.selfnode)
         self.table = dict()
         self.server.start()
         if bootstrap_node:
-            self._bootstrap(bootstrap_node)
+            message(boostrap_node, BOOTSTRAP,
+                    {'ip': local_ip, 'port': local_port})
     
     def _handle(self, conn, data):
-        try:
-            resp = json.loads(data)
-            if resp['msg'] == 'BOOTSTRAP':
-                # make connection to peer
-                s = socket.socket()
-                s.connect((resp['data']['ip'], resp['data']['port']))
-                s.send(json.dumps({'msg':'PEERS', 'data':self.peers}))
-                s.close()
-            
-            if resp['msg'] == 'PEERS':
-                others = resp['data']
-                self.peers += [tuple(p) for p in others]
-                for peer in others:
-                    s = socket.socket()
-                    s.connect(tuple(peer))
-                    s.send(json.dumps({'msg':'ANNOUNCE', 'data':{'ip':self.ip, 'port':self.port}}))
-                    s.close()
-            
-            if resp['msg'] == 'ANNOUNCE':
-                save_print("ANNOUN")
-                peer_ip = resp['data']['ip']
-                peer_port = resp['data']['port']
-                self.peers += [(peer_ip, peer_port)]
-            
-            if resp['msg'] == 'SET':
-                data = resp['data']
-                self.table[data['key']] = data['value']
-            
-            if resp['msg'] == 'GET':
-                save_print('get')
-                lookup = resp['data']['key']
-                save_print('lookingup', conn.fileno())
-                if self.table.has_key(lookup):
-                    save_print('found', self.port)
-                    conn.send(json.dumps({'msg':'RECV','data':self.table[lookup]}))
-                else:
-                    conn.send("nothing")
-        except:
-            pass
-    
-    def _bootstrap(self, bootstrap_node):
-        s = socket.socket()
-        s.connect(bootstrap_node)
-        s.send(json.dumps({'msg':'BOOTSTRAP', 'data':{'ip':self.ip, 'port':self.port}}))
-        s.close()
+        resp = json.loads(data)
+        
+        if resp['msg'] == BOOTSTRAP:
+            newpeer = (resp['ip'], resp['port'])
+            message(newpeer, PEERS, {'peers': self.peers})
+            self.peers += newpeer
+        
+        elif resp['msg'] == PEERS:
+            others = resp['peers']
+            self.peers += [Peer(ip, port) for ip, port in others]
+            for peer in others:
+                message(peer.astuple(), ANNOUNCE,
+                        {'ip': self.ip, 'port':self.port})
+        
+        elif resp['msg'] == ANNOUNCE:
+            peer_ip = resp['data']['ip']
+            peer_port = resp['data']['port']
+            self.peers.add(Peer(peer_ip, peer_port))
+        
+        elif resp['msg'] == SET:
+           key, value = hash(resp['key']), resp['value']
+           self.table[key] = value
+        
+        elif resp['msg'] == GET:
+            key = hash(resp['key'])
+            if self.table.has_key(key):
+                message(conn, RECV, {'value': self.table[key]})
+            else:
+                message(conn, RECV, {'value': None})
     
     def __getitem__(self, key):
         for p in self.peers:
-            s = socket.socket()
-            s.connect(p)
-            s.send(json.dumps({'msg':'GET', 'data':{'key':key}}))
-            try:
-                resp = s.recv(1024)
-                save_print("RESPONSE", resp)
-                if resp != "nothing":
-                    resp = json.loads(resp)
-                    return(resp['data'])
-            except:
-                save_print('hello error')
-            s.close()
+            resp = message(p.astuple(), GET, {'key':key}, receive=True)
+            if resp and resp['msg'] == RECV:
+                return resp['value']
     
     def __setitem__(self, key, value):
-        peer = random.choice(self.peers)
-        s = socket.socket()
-        s.connect(peer)
-        s.send(json.dumps({'msg':'SET','data':{'key':key, 'value':value}}))
-        s.close()
+        peer = random.choice(self.peers.list)
+        message(peer.astuple(), SET, {'key': key, 'value':value})
+
 
 import time
 if __name__ == '__main__':
     import sys
     bootport = int(sys.argv[1])
-    a = DHT(None, local_ip='192.168.0.107', local_port=bootport)
+    a = DHT(None, local_ip='localhost', local_port=bootport)
     a['/'] = [['.', 1, 0],['file1', 0, 132], ['dir1',1,0]]
     a['/file1'] = [['file1',0, 132]]
     a['/dir1'] = [['.', 1, 0], ['file2', 0, 142]]
     a['/dir1/file2'] = [['file2', 0, 142]]
-    time.sleep(1000)
+    print a['/dir1']
 
