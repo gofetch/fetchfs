@@ -98,7 +98,7 @@ import time
 if __name__ == '__main__':
     import sys
     bootport = int(sys.argv[1])
-    a = DHT(None, local_ip='localhost', local_port=bootport)
+    a = DHT(None, local_ip='192.168.0.107', local_port=bootport)
     a['/'] = [['.', 1, 0],['file1', 0, 132], ['dir1',1,0]]
     a['/file1'] = [['file1',0, 132]]
     a['/dir1'] = [['.', 1, 0], ['file2', 0, 142]]

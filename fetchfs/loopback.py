@@ -24,7 +24,7 @@ def get_dir(path):
         return []
 
 
-class Loopback(LoggingMixIn, Operations):
+class FetchFS(LoggingMixIn, Operations):
     def __init__(self, root):
         self.realroot = realpath(root)
         self.rwlock = Lock()
