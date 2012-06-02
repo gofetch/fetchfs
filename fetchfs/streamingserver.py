@@ -12,6 +12,7 @@ class StreamingServer(threading.Thread):
         self.host = host
         self.port = port
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+        print host, port
         self.server.bind((host,port)) 
         self.server.listen(5)
         self.chunksize = chunksize

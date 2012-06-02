@@ -14,14 +14,20 @@ from stat import S_IFDIR, S_IFREG
 
 from dht import DHT
 
+import utils
 
 class FetchFS(LoggingMixIn, Operations):
     def __init__(self, root, bootstrap_node, local_ip='localhost',
                  local_port=8000):
+        print(bootstrap_node)
         self.realroot = realpath(root)
         self.rwlock = Lock()
         self.dht = DHT(bootstrap_node, local_ip, local_port)
-
+        # walk dir and update dht
+        files = utils.rgetdir(self.realroot)
+        self.dht.update(files)
+        print self.dht['/']
+    
     def __call__(self, op, path, *args):
         return super(FetchFS, self).__call__(op, self.realroot + path, *args)
     
@@ -30,7 +36,8 @@ class FetchFS(LoggingMixIn, Operations):
         return '/' if relpath == '/.' else relpath
     
     def getattr(self, path, fh=None):
-        relpath = _relpath(path)
+        relpath = self._relpath(path)
+        print 'getattr', relpath
         basename = os.path.basename(path)
         notallowed = ['Backups.backupdb', 'private', 'mach_kernel']
         if os.path.exists(path):
@@ -43,21 +50,18 @@ class FetchFS(LoggingMixIn, Operations):
                                                             'st_nlink',
                                                             'st_size',
                                                             'st_uid'))
-        
         elif relpath == '/':
             st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)
-        
         elif basename.startswith('.') or basename in notallowed:
             raise FuseOSError(ENOENT)
         
         # look outside in the DHT
         externfile = self.dht[relpath]
-        if externfile['st_mode'] == S_IFREG:
-            st = dict(st_mode =(S_IFREG | 0444), st_size=extern[0][2])
-        elif externfile['st_mode'] == S_IFDIR:
-            st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)
+        if externfile['isdir'] == S_IFDIR:
+            st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)        
         else:
-            raise FuseOSError(ENOENT)
+            st = dict(st_mode =(S_IFREG | 0444), st_size=externfile['st_size'])
+        
         st['st_ctime'] = st['st_mtime'] = st['st_atime'] = externfile['st_mtime']
         return st
     
@@ -66,7 +70,8 @@ class FetchFS(LoggingMixIn, Operations):
         realdir = ['.', '..']
         if os.path.exists(path):
             realdir += os.listdir(path)
-        externfile = self.dht[path]
+        print 'looking up list', relpath
+        externfile = self.dht[relpath]
         externdir = externfile['ls'] if externfile else []
         return realdir + externdir
     
@@ -104,10 +109,11 @@ class FetchFS(LoggingMixIn, Operations):
 
 
 if __name__ == '__main__':
-    if len(argv) != 3:
+    if len(argv) != 5:
         print('usage: %s <root> <mountpoint>' % argv[0])
         exit(1)
-    fuse = FUSE(Loopback(argv[1]), argv[2], foreground=True,
+    fetchfs = FetchFS(argv[1], (argv[3], int(argv[4])))
+    fuse = FUSE(fetchfs, argv[2], foreground=True,
                 fsname="FetchFS", volname="FetchFS")
 
 
