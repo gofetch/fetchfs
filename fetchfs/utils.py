@@ -3,9 +3,18 @@ from threading import Lock
 import socket
 import json
 import hashlib
+import os
 
 def hash(i):
     return hashlib.sha1(i).hexdigest()
+
+def hash_file(path):
+    md5 = hashlib.md5()
+    with open(path, 'r') as f:
+        for chunk in iter(lambda: f.read(md5.block_size), b''):
+            md5.update(chunk)
+    return md5.hexdigest()
+
 
 print_lock = Lock()
 def save_print(*args, **kwargs):
@@ -84,3 +93,29 @@ KEYSPACE_SIZE = 2 ** 160
 
 # stabilization_time
 STABILIZE_WAIT = 1
+
+# file walking
+def getrelpath(path, root):
+    relpath = '/' + os.path.relpath(path, root)
+    return '/' if relpath == '/.' else relpath
+
+
+def rgetdir(rootdir):
+    dir = {}
+    for root, subFolders, files in os.walk(rootdir):
+        rel = getrelpath(root, rootdir)
+        fstat = os.stat(root)
+        dir[rel] = {'isdir': 1,
+                    'ls': subFolders + files }
+        for f in files:
+            fullf = os.path.join(root, f)
+            stat = os.stat(fullf)
+            dir[rel] = {'isdir': 0,
+                        'ls': [],
+                        'st_mtime': stat.st_mtime,
+                        'st_size': stat.st_size,
+                        'hash': hash_file(fullf)}
+
+    return dir
+
+

@@ -15,7 +15,11 @@ class Peer:
     
     def __repr__(self):
         return repr((self.ip, self.port))
-    
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__)
+            and self.__dict__ == other.__dict__)
+    def __ne__(self, other):
+        return not self.__eq__(other)
     def astuple(self):
         return (self.ip, self.port)
 
@@ -24,19 +28,16 @@ class PeerList:
     ''' a sorted list of peers based on hash id. '''
     def __init__(self):
         self.list = []
-
     def __iter__(self):
         return self.list.__iter__()
-    
     def _sort(self):
         sorted(self.list, key= lambda peer: peer.id)
-    
     def add(self, peer):
         assert isinstance(peer, Peer)
         if peer not in self.list:
+            print 'adding', peer, self.list
             self.list.append(peer)
             self._sort()
-    
     def remove(self, peer):
         self.list.remove(peer)
 
