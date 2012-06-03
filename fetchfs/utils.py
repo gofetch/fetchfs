@@ -20,19 +20,7 @@ print_lock = Lock()
 def save_print(*args, **kwargs):
     with print_lock:
         print (*args, **kwargs)
-        
-def within(x, a, b):
-    ''' True if x is within the arc along the circle beginning above a and ending at b'''
-    effective_b = b
-    if a:
-        if a > b:
-            b += KEYSPACE_SIZE
-        if a > x:
-            x += KEYSPACE_SIZE
-        return x > a and x < b
-    else:
-        return x < b
-            
+
 
 def message(peer, msg, data, receive=False, wait=0.0):
     ''' sends a message to a peer
@@ -44,7 +32,7 @@ def message(peer, msg, data, receive=False, wait=0.0):
         s = peer
     else:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(peer.astuple())
+        s.connect(peer)
     msgsend = {"msg":msg}
     msgsend.update(data)
     sent = s.send(json.dumps(msgsend))
@@ -57,44 +45,28 @@ def message(peer, msg, data, receive=False, wait=0.0):
         return json.loads(response)
     if isinstance(peer, tuple):
         s.close()
-        
-def get_successor_message(key):
-    return {'key': key}
-    
-def notify_message(predecessor):
-    return {'predecessor': predecessor}
-    
-def store_message(key, value):
-    return {'key': key, 'value': value}
-    
-def get_message(key):
-    return {'key': key}
 
-def get_response(value):
-    return {'value': value}
 
-def get_predecessor():
-    return {}
-    
-def get_predecessor_response(predecessor):
-    return {'predecessor': predecessor}
 
 # message types
 
-GETSUCCESSOR = 0 # get successor to a key
-NOTIFY = 1 # notify a node of a predecessor
-STORE = 2 # store a key and value at a node
-GET = 3 # get a value from a node given a key
-GETPREDECESSOR = 4 # get a predecessor from a node
+BOOTSTRAP = 0 # request to be boostrapped
+PEERS = 1 # return list of peers you know
+ANNOUNCE = 2 # announce to peers of your existence
+SET = 3 # set a value for a key
+GET = 4 # get a value for a key
+RECV = 5 # return the value of the key
+NAK = 6 # response is null or unkown
+ACK = 7 # request is accepted by peer
 
-# keyspace size
-KEYSPACE_BITS = 160
-KEYSPACE_SIZE = 2 ** 160
 
-# stabilization_time
-STABILIZE_WAIT = 1
+
+
 
 # file walking
+
+
+
 def getrelpath(path, root):
     relpath = '/' + os.path.relpath(path, root)
     return '/' if relpath == '/.' else relpath
@@ -141,7 +113,3 @@ def rdict_update(old, new):
 
 
 
-    
-if __name__ == '__main__':
-    r = '/Users/tal/Projects/fetchfs/fetchfs/A'
-    print(rgetdir(r))
