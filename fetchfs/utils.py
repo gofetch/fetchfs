@@ -82,7 +82,8 @@ def rgetdir(rootdir):
         for f in files:
             fullf = os.path.join(root, f)
             stat = os.stat(fullf)
-            dir[rel] = {'isdir': 0,
+            relf = getrelpath(fullf, rootdir)
+            dir[relf] = {'isdir': 0,
                         'ls': [],
                         'st_mtime': stat.st_mtime,
                         'st_size': stat.st_size,
@@ -91,3 +92,28 @@ def rgetdir(rootdir):
     return dir
 
 
+
+
+def rdict_update(old, new):
+    for key, newval in new.iteritems():
+        if key in old:
+            if type(old[key]) != type(newval):
+                raise RuntimeError('update values must be of same type')
+            
+            elif isinstance(old[key], dict):
+                dr_update(old[key], newval)
+            
+            elif isinstance(old[key],list):
+                old[key] = list(set(old[key]) | set(newval))
+            
+            else:
+                old[key] = newval
+        else:
+            old[key] = newval
+
+
+
+    
+if __name__ == '__main__':
+    r = '/Users/tal/Projects/fetchfs/fetchfs/A'
+    print(rgetdir(r))

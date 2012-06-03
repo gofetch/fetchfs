@@ -19,14 +19,19 @@ import utils
 class FetchFS(LoggingMixIn, Operations):
     def __init__(self, root, bootstrap_node, local_ip='localhost',
                  local_port=8000):
-        print(bootstrap_node)
         self.realroot = realpath(root)
         self.rwlock = Lock()
+        print 'connecting to', bootstrap_node, local_ip, local_port
         self.dht = DHT(bootstrap_node, local_ip, local_port)
         # walk dir and update dht
         files = utils.rgetdir(self.realroot)
-        self.dht.update(files)
-        print self.dht['/']
+        for path, newval in files.iteritems():
+            newold = self.dht[path]
+            if newold:
+                utils.rdict_update(newold, newval)
+                self.dht[path] = newold
+            else:
+                self.dht[path] = newval
     
     def __call__(self, op, path, *args):
         return super(FetchFS, self).__call__(op, self.realroot + path, *args)
@@ -37,7 +42,6 @@ class FetchFS(LoggingMixIn, Operations):
     
     def getattr(self, path, fh=None):
         relpath = self._relpath(path)
-        print 'getattr', relpath
         basename = os.path.basename(path)
         notallowed = ['Backups.backupdb', 'private', 'mach_kernel']
         if os.path.exists(path):
@@ -52,6 +56,7 @@ class FetchFS(LoggingMixIn, Operations):
                                                             'st_uid'))
         elif relpath == '/':
             st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)
+        
         elif basename.startswith('.') or basename in notallowed:
             raise FuseOSError(ENOENT)
         
@@ -70,10 +75,9 @@ class FetchFS(LoggingMixIn, Operations):
         realdir = ['.', '..']
         if os.path.exists(path):
             realdir += os.listdir(path)
-        print 'looking up list', relpath
         externfile = self.dht[relpath]
         externdir = externfile['ls'] if externfile else []
-        return realdir + externdir
+        return list(set(realdir) | set(externdir) )
     
     def statfs(self, path):
         stv = os.statvfs(path)
@@ -109,11 +113,16 @@ class FetchFS(LoggingMixIn, Operations):
 
 
 if __name__ == '__main__':
-    if len(argv) != 5:
-        print('usage: %s <root> <mountpoint>' % argv[0])
+    if len(argv) != 5 and len(argv) != 7:
+        print('usage: %s <root> <mountpoint> <local_ip> <local_port> ' \
+                  '[<boot_ip> <boot_port>]'% argv[0])
         exit(1)
-    fetchfs = FetchFS(argv[1], (argv[3], int(argv[4])))
+    if len(argv) == 5:
+        fetchfs = FetchFS(argv[1], None, argv[3], int(argv[4]))
+    elif len(argv) == 7:
+        fetchfs = FetchFS(argv[1], (argv[5], int(argv[6])),
+                          argv[3], int(argv[4]))
     fuse = FUSE(fetchfs, argv[2], foreground=True,
-                fsname="FetchFS", volname="FetchFS")
+                fsname="FetchFS", volname="FetchFS", nothreads=True)
 
 

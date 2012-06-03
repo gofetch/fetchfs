@@ -10,13 +10,17 @@ class Peer:
         self.ip = ip
         self.port = port
         self.id = hash(repr(self))
+    
     def __repr__(self):
         return repr((self.ip, self.port))
+    
     def __eq__(self, other):
         return (isinstance(other, self.__class__)
             and self.__dict__ == other.__dict__)
+    
     def __ne__(self, other):
         return not self.__eq__(other)
+    
     def astuple(self):
         return (self.ip, self.port)
 
@@ -25,18 +29,19 @@ class PeerList:
     ''' a sorted list of peers based on hash id. '''
     def __init__(self):
         self.list = []
+    
     def __iter__(self):
         return self.list.__iter__()
-    def _sort(self):
-        sorted(self.list, key= lambda peer: peer.id)
+    
     def add(self, peer):
         assert isinstance(peer, Peer)
         if peer not in self.list:
-            print 'adding', peer, self.list
             self.list.append(peer)
-            self._sort()
+    
     def remove(self, peer):
         self.list.remove(peer)
+
+
 
 class DHT:
     def __init__(self, bootstrap_node, local_ip='localhost', local_port=8000):
@@ -86,7 +91,7 @@ class DHT:
     def __getitem__(self, key):
         for p in self.peers.list:
             resp = message(p.astuple(), GET, {'key':key}, receive=True)
-            if resp and resp['msg'] == RECV:
+            if resp and resp['value']:
                 return resp['value']
     
     def __setitem__(self, key, value):
@@ -102,16 +107,9 @@ if __name__ == '__main__':
     import sys
     bootport = int(sys.argv[1])
     a = DHT(None, local_ip='localhost', local_port=bootport)
-    b = DHT(('localhost', bootport), local_ip='localhost', local_port=bootport+1)
-    a['/'] = { 'isdir': 1,
-                     'ls': ['hello.py']}
-    a['/hello.py'] = {'isdir': 0,
-                      'ls':[],
-                      'st_mtime':0.0,
-                      'st_size':0,
-                      'hash':'a'}
-    time.sleep(1)
-    print a.peers.list
-    print b.peers.list
+    while True:
+        print a['a']
+        time.sleep(1)
+
 
 
