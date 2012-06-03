@@ -21,7 +21,6 @@ class FetchFS(LoggingMixIn, Operations):
                  local_port=8000):
         self.realroot = realpath(root)
         self.rwlock = Lock()
-        print 'connecting to', bootstrap_node, local_ip, local_port
         self.dht = DHT(bootstrap_node, local_ip, local_port)
         # walk dir and update dht
         files = utils.rgetdir(self.realroot)
