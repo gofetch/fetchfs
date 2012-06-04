@@ -108,7 +108,7 @@ if __name__ == '__main__':
     bootport = int(sys.argv[1])
     a = DHT(None, local_ip='localhost', local_port=bootport)
     while True:
-        print a['a']
+        print a['/']
         time.sleep(1)
 
 

@@ -15,6 +15,7 @@ from stat import S_IFDIR, S_IFREG
 from dht import DHT
 
 import utils
+import time
 
 class FetchFS(LoggingMixIn, Operations):
     def __init__(self, root, bootstrap_node, local_ip='localhost',
@@ -22,6 +23,7 @@ class FetchFS(LoggingMixIn, Operations):
         self.realroot = realpath(root)
         self.rwlock = Lock()
         self.dht = DHT(bootstrap_node, local_ip, local_port)
+        time.sleep(3)
         # walk dir and update dht
         files = utils.rgetdir(self.realroot)
         for path, newval in files.iteritems():
@@ -31,6 +33,7 @@ class FetchFS(LoggingMixIn, Operations):
                 self.dht[path] = newold
             else:
                 self.dht[path] = newval
+        print "done mounting"
     
     def __call__(self, op, path, *args):
         return super(FetchFS, self).__call__(op, self.realroot + path, *args)
@@ -61,7 +64,9 @@ class FetchFS(LoggingMixIn, Operations):
         
         # look outside in the DHT
         externfile = self.dht[relpath]
-        if externfile['isdir'] == S_IFDIR:
+        if not externfile:
+            raise FuseOSError(ENOENT)
+        if externfile['isdir']:
             st = dict(st_mode=(S_IFDIR | 0755), st_nlink=2)        
         else:
             st = dict(st_mode =(S_IFREG | 0444), st_size=externfile['st_size'])
@@ -91,10 +96,19 @@ class FetchFS(LoggingMixIn, Operations):
                                                          'f_frsize',
                                                          'f_namemax'))
     
-    def rename(self, old, new):
-        return os.rename(old, self.realroot + new)
+    def mkdir(self, path, mode):
+        relpath = self._relpath(path)
+        folder_name = os.path.basename(relpath)
+        os.mkdir(path, mode)
+        self.dht[relpath] = utils.path_stat(path)
+        # update ls of parent
+        dirname = os.path.dirname(relpath)
+        par = self.dht[dirname]
+        utils.rdict_update(par, {'ls':[folder_name]})
+        self.dht[dirname] = par
     
-    mkdir = os.mkdir
+    
+    rename = None
     rmdir = os.rmdir
     mknod = None
     open = None

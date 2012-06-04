@@ -74,11 +74,12 @@ def getrelpath(path, root):
 
 def rgetdir(rootdir):
     dir = {}
-    for root, subFolders, files in os.walk(rootdir):
+    for root, subFolders, files in os.walk(unicode(rootdir)):
         rel = getrelpath(root, rootdir)
         fstat = os.stat(root)
         dir[rel] = {'isdir': 1,
-                    'ls': subFolders + files }
+                    'ls': subFolders + files,
+                    'st_mtime': fstat.st_mtime}
         for f in files:
             fullf = os.path.join(root, f)
             stat = os.stat(fullf)
@@ -93,6 +94,19 @@ def rgetdir(rootdir):
 
 
 
+def path_stat(path):
+    stat = os.stat(path)
+    if os.path.isdir(path):
+        return {'isdir': 1,
+                'ls': os.listdir(path),
+                'st_mtime': stat.st_mtime}
+    else:
+        return {'isdir': 0,
+                'ls': [],
+                'st_mtime': stat.st_mtime,
+                'st_size': stat.st_size,
+                'hash': hash_file(path)}
+
 
 def rdict_update(old, new):
     for key, newval in new.iteritems():
@@ -101,7 +115,7 @@ def rdict_update(old, new):
                 raise RuntimeError('update values must be of same type')
             
             elif isinstance(old[key], dict):
-                dr_update(old[key], newval)
+                rdict_update(old[key], newval)
             
             elif isinstance(old[key],list):
                 old[key] = list(set(old[key]) | set(newval))
